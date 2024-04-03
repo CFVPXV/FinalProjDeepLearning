@@ -5,13 +5,7 @@ import numpy as np
 import cv2
 import json
 
-final_json = {"images": [], "annotations": [], "categories": [
-    {"id": 0, "name": "unknown"}, 
-    {"id": 1, "name": "vehicle"}, 
-    {"id": 2, "name": "pedestrian"}, 
-    {"id": 3, "name": 'sign'}, 
-    {'id': 4, 'name': 'cyclist'}
-    ]}
+
 
 # Convert the xy center to xy upper left, and return in a coco friendly format!
 def convert_xy(center_x, center_y, width, length):
@@ -19,13 +13,23 @@ def convert_xy(center_x, center_y, width, length):
     upper_left_y = (center_y - (0.5 * length))
     return [upper_left_x, upper_left_y, width, length]
 
-def add_annotation(frame, curr_iter):
+def add_annotation(frame, curr_iter, json_file):
     for i in frame.camera_labels:
         for j in i.labels:
-            final_json["annotations"].append({"image_id": curr_iter, "bbox": convert_xy(j.box.center_x, j.box.center_y, j.box.width, j.box.length), "category_id": j.type})
+            json_file["annotations"].append({"image_id": curr_iter, "bbox": convert_xy(j.box.center_x, j.box.center_y, j.box.width, j.box.length), "category_id": j.type})
+    return json_file
 
 
 def split_sets(set_data, set_name):
+    item = 0
+
+    final_json = {"images": [], "annotations": [], "categories": [
+    {"id": 0, "name": "background"}, 
+    {"id": 1, "name": "vehicle"}, 
+    {"id": 2, "name": "pedestrian"}, 
+    {"id": 3, "name": 'sign'}, 
+    {'id': 4, 'name': 'cyclist'}
+    ]}
 
     for cmd in set_data:
         os.system(f"gsutil -m cp {cmd} ./intermediary")
@@ -42,8 +46,8 @@ def split_sets(set_data, set_name):
         for index, image in enumerate(frame.images):
             filename = f"img{item}.jpg"
             final_json["images"].append({"id": item, "file_name": filename})
-            add_annotation(frame, curr_iter=item)
-            cv2.imwrite(f"{set_name}/{filename}", np.array(tf.image.decode_jpeg(image.image)))
+            final_json = add_annotation(frame, item, final_json)
+            cv2.imwrite(f"{set_name}/images/{filename}", np.array(tf.image.decode_jpeg(image.image)))
             item += 1
 
         os.system(f"rm intermediary/{inter[0]}")
@@ -52,7 +56,7 @@ def split_sets(set_data, set_name):
         json.dump(final_json, outfile)
 
 
-item = 0
+
 
 with open("ingestion.txt", "r") as file:
     all_data = file.readlines()
@@ -62,9 +66,9 @@ with open("ingestion.txt", "r") as file:
 
 print(all_data)
 
-train = all_data[:len(all_data) * 0.8]
+train = all_data[:int(len(all_data) * 0.8)]
 
-valid = all_data[:len(all_data) * 0.8:]
+valid = all_data[int(len(all_data) * 0.8):]
 
 split_sets(train, "train")
 
